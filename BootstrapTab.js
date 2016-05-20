@@ -1,98 +1,136 @@
 (function($){
-    var getDefaultTabListId = function(obj,id){
-        var id  = id || obj.attr('id');
-        return 'tab_' + id;
+    var tabPre = 'tab_', panelPre = 'panel_';
+    var getTabId = function(id){
+        return tabPre + id;
     };
 
-    var getDefaultTabContentId = function(obj,id){
-      var id  = id || obj.attr('id');
-        return 'tab_' + id;
+    var getPanelId = function(id){
+        return panelPre + id;
     };
-
-  var methods = {
-    init:function (options){
-      var settings = this.data('bootstrapTab');
-      if(settings == undefined) {
-          var defaults = {
-                    tabIndex : 0,
-                    tabItems : {},
-                }
+    var defaults = {
+        tabIndex : 0,
+        tabItems : {},
+    }
+    var methods = {
+        init:function (options){
+            var settings = this.data('bootstrapTab');
+            if(settings == undefined) {
                 settings = $.extend({}, defaults, options);
-      } else {
-          settings = $.extend({}, settings, options);
+            } else {
+                settings = $.extend({}, settings, options);
             }
-        this.data('bootstrapTab', settings);
+            this.data('bootstrapTab', settings);
             var id = settings.id = settings.id || this.attr('id');
             id = id || '';
-            settings.tabListId = settings.tablist || getDefaultTabListId(this,id);
-            settings.tabContentId = settings.tabContentId || getDefaultTabContentId(this,id);
-            $('<ul>',{
-              id : settings.tabListId,
-              class:'nav nav-tabs',
-              role:'tablist',
+            settings.tabId = settings.tablist || getTabId(id);
+            settings.PanelId = settings.PanelId || getPanelId(id);
+            //创建tab list 
+            this.$list = $('<ul>',{
+                id : settings.tabId,
+                class:'nav nav-tabs',
+                role:'tablist',
             }).appendTo(this);
             
-            $('<div>',{
-              id : settings.tabContentId,
-              class:'tab-content'
+            //创建tab content pane
+            this.$panel = $('<div>',{
+                id : settings.PanelId,
+                class:'tab-content'
             }).appendTo(this);
+
+            //点击关闭按钮，删除tab
             var self = this;
             this.on('click', '.close-tab', function () {
                 var id = $(this).parent().attr("id-controls");
                 methods['_removeById'].call(self,id);
             });
             return this;
-    },
+        },
 
-    add : function(options){
-            var id = 'tab_' + options.title,closeable = options.closeable;
+        add : function(options){
+            var tabId = getTabId(options.id), panelId = getPanelId(options.id), closeable = options.closeable;
             var settings = this.data('bootstrapTab');
-            settings.tabItems[options.title] = id;
+            
+            settings.tabItems[options.id] = options.id;
             this.find('.active').removeClass('active');
-            var list = this.find('li').filter(function(){
-               return this.id == "#" + id;
-            });
-            if(list.length){
-              this.find('li').filter(function(){
-                 return this.id == "#" + id;
-              }).addClass('active');
-              this.find('div').filter(function(){
-                 return this.id == id;
-              }).addClass('active');
-              return this;
-            }
             var a = $('<a>',{
-                    href:'#'+id,
-                    role:'tab',
-                    'id-controls':id,
-                    "data-toggle":'tab'
-                }).html(options.title || '');
-            if(closeable){
-                $('<button class="close close-tab" type="button" title="Remove this page">×</button>').appendTo(a);
-            }
+                href: '#'+panelId,
+                role:'tab',
+                'aria-controls':panelId,
+                "data-toggle":'tab'
+            }).html(options.text || options.id);
+            
             var title = $('<li>',{
-                class:'active',
-                id : "#" + id,
-            }).append(
-               a 
-            );
+                class: 'active',
+                role: "presentation",
+                id: tabId,
+            }).append(a);
+            //是否添加删除按钮
+            if(closeable){
+                var self = this;
+                var $i = $('<i class="icon-remove-sign"></i>')
+                .appendTo(a)
+                .click(function(event) {
+                    var next;
+                    if(title.hasClass('active')){
+                        next = title.prev();
+                        if(next.length<=0) next = title.next();
+                    }
+                    title.remove();
+                    content.remove();
+                    if(next){
+                        // next.addClass('active');
+                        next.children('a').first().tab('show');
+                    }
+                }).mouseover(function(event) {
+                    $(this).css('color', 'rgba(0,0,0,0.5)');
+                }).mouseout(function(event) {
+                    $(this).css('color', 'rgba(85,85,85,1)');
+                });
+            }
             var content = $('<div>',{
                 class:'tab-pane active',
-                id : id,
+                id : panelId,
+                role: "tabpanel"
             });
-            if(typeof (options.content) == 'string'){
-                content.html(options.content);
-            }else {
+            this.$list.append(title);
+            this.$panel.append(content);
+            
+            var contentDiv = options.content;
+            if(typeof(contentDiv) == 'string'){
+                content.html(contentDiv);
+            } else if(typeof(contentDiv) == 'function'){
+                contentDiv = contentDiv(content);
+            } else {
                 $(options.content).appendTo(content);
             }
-            this.find('.nav-tabs').append(title);
-            this.find('.tab-content').append(content);
+            
             return this;
-    },
+        },
 
-        remove: function  (title) {
-            var id = 'tab_' + title;
-            return methods['_removeById'].call(this,id);
+        remove: function  (id) {
+            var tabId = getTabId(id), tab = this.find('li#'+tabId);
+            if(tab.length > 0){
+                var next;
+                if(tab.hasClass('active')){
+                    next = tab.prev();
+                    if(next.length<=0) next = tab.next();
+                }
+                var panelId = getPanelId(id), panel = this.find('div#'+panelId);
+                tab.remove();
+                panel.remove();
+                if(next){
+                    // next.addClass('active');
+                    next.children('a').first().tab('show');
+                }
+            }
+        },   
+        show: function(id){
+            var panelId = getPanelId(id);
+            this.find('a[href="#'+panelId+'"]').tab('show');
+        },
+        isContained: function(id){
+            var tabId = getTabId(id);
+            return this.find('li#'+tabId).length > 0;
         },
 
         _removeById : function  (id) {
@@ -118,16 +156,16 @@
             return this;
         },
 
-    getSelectIndex : function(){
+        getSelectIndex : function(){
 
-    },
+        },
 
-    val : function(){
+        val : function(){
 
-    },
-  };
-  $.fn.bootstrapTab = function() {
-    var method = arguments[0];
+        },
+    };
+    $.fn.bootstrapTab = function() {
+        var method = arguments[0];
         if(methods[method]) {
             method = methods[method];
             arguments = Array.prototype.slice.call(arguments, 1);
@@ -138,6 +176,6 @@
             return this;
         }
         return method.apply(this, arguments);
-  };
+    };
 })(jQuery);
 
